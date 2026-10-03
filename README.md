@@ -88,7 +88,7 @@ StorageRelief operates under strict safety principles:
 ### 1. Clone & Setup
 ```powershell
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/StorageRelief-Python.git
+git clone https://github.com/saksham-kumar1621/StorageRelief-Python.git
 cd StorageRelief-Python
 
 # Install required dependencies
@@ -152,6 +152,18 @@ StorageRelief-Python/
 ├── SECURITY.md             # Security and safe deletion policy
 └── LICENSE                 # MIT License
 ```
+
+---
+
+## 👤 Author & Connect
+
+Crafted with care by **One Saksham** ([@saksham-kumar1621](https://github.com/saksham-kumar1621))  
+*Coding | Designing | Editing | Turning ideas into digital magic.*
+
+- 🌐 **Portfolio:** [praveadhk.vercel.app](https://praveadhk.vercel.app/)
+- 💼 **LinkedIn:** [Saksham Kumar](https://linkedin.com/in/saksham-kumar-164996356)
+- 📸 **Instagram:** [@one._saksham._](https://instagram.com/one._saksham._)
+- ✉️ **Email:** [sakshamkumar1621@gmail.com](mailto:sakshamkumar1621@gmail.com)
 
 ---
 

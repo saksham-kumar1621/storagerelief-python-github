@@ -8,7 +8,7 @@ Thank you for your interest in improving StorageRelief! We welcome contributions
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/StorageRelief-Python.git
+   git clone https://github.com/saksham-kumar1621/StorageRelief-Python.git
    cd StorageRelief-Python
    ```
 
