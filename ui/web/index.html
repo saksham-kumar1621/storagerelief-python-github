@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StorageRelief — Next-Gen Windows Storage Optimizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="assets/icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="main.js" defer></script>
+  </head>
+
+  <body>
+    <div class="app-layout">
+      <!-- Top Header Navigation -->
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <img src="assets/icon.png" alt="StorageRelief Logo" class="brand-img" />
+          </div>
+          <div class="brand-text">
+            <h1>StorageRelief</h1>
+            <span class="badge-version">v1.2 • Holographic Edition</span>
+          </div>
+        </div>
+
+        <!-- Centered Mode Navigation Switcher -->
+        <nav class="nav-modes">
+          <button id="nav-mode-cleaner" class="nav-mode-btn active" data-view="cleaner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+              <path d="M12 12L16 8" />
+            </svg>
+            <span>System Cleaner</span>
+          </button>
+          <button id="nav-mode-duplicates" class="nav-mode-btn" data-view="duplicates">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            <span>Duplicate Hunter</span>
+            <span id="nav-dup-badge" class="nav-badge hidden">0</span>
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <div class="sys-badge" id="scan-status-badge">
+            <span class="status-dot"></span>
+            <span id="status-text">Ready</span>
+          </div>
+          <button id="btn-scan" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-spin-target">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            <span id="btn-scan-label">Scan Drive (C:)</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Scrollable Dashboard Content -->
+      <main class="app-main">
+        <!-- System Cleaner View -->
+        <div id="view-cleaner" class="app-view">
+          <!-- Overview Hero Section -->
+          <section class="overview-grid">
+          <!-- Drive Gauge Card -->
+          <div class="glass-card drive-card">
+            <div class="card-header drive-card-header">
+              <!-- Interactive Multi-Drive Selector Trigger & Popover -->
+              <div class="drive-selector-wrapper" id="drive-selector-wrapper">
+                <button
+                  type="button"
+                  id="drive-selector-trigger"
+                  class="drive-selector-btn"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  title="Switch target drive partition or storage media"
+                >
+                  <div class="drive-trigger-icon" id="drive-trigger-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                      <line x1="6" y1="6" x2="6.01" y2="6" />
+                      <line x1="6" y1="18" x2="6.01" y2="18" />
+                    </svg>
+                  </div>
+                  <div class="drive-trigger-info">
+                    <span id="active-drive-display" class="drive-trigger-title">Drive (C:)</span>
+                    <span id="active-drive-label" class="drive-label-tag">OS</span>
+                  </div>
+                  <svg class="drive-trigger-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                <!-- Drive Selector Popover Dropdown -->
+                <div id="drive-dropdown" class="drive-dropdown-menu hidden">
+                  <div class="drive-dropdown-header">
+                    <span>Detected Storage Volumes</span>
+                    <button id="btn-refresh-drives" class="btn-refresh-drives" title="Rescan for connected USB / NVMe drives">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                      </svg>
+                      <span>Rescan</span>
+                    </button>
+                  </div>
+                  <div id="drive-dropdown-list" class="drive-dropdown-list" role="listbox">
+                    <!-- Dynamic Drive Items Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Drive Badges (Type & File System) -->
+              <div class="drive-header-meta">
+                <span id="active-drive-type-badge" class="drive-type-badge">System NVMe</span>
+                <span id="active-drive-fs-badge" class="drive-type">NTFS</span>
+              </div>
+            </div>
+
+            <div class="drive-gauge-wrapper">
+              <div class="circular-chart">
+                <svg viewBox="0 0 36 36" class="gauge-svg">
+                  <path
+                    class="gauge-bg"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    id="gauge-fill"
+                    class="gauge-progress"
+                    stroke-dasharray="0, 100"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <div class="gauge-content">
+                  <span id="gauge-percent" class="gauge-num">--%</span>
+                  <span class="gauge-sub">Free Space</span>
+                </div>
+              </div>
+
+              <div class="drive-stats-list">
+                <div class="stat-row">
+                  <span class="stat-label">Free Space</span>
+                  <span id="stat-free" class="stat-value text-emerald">-- GB</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">Used Space</span>
+                  <span id="stat-used" class="stat-value text-slate">-- GB</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">Total Capacity</span>
+                  <span id="stat-total" class="stat-value text-muted">-- GB</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div id="drive-linear-progress" class="progress-bar-fill"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reclaimable Potential Card -->
+          <div class="glass-card reclaim-card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                <span>Reclaimable Relief</span>
+              </div>
+              <span id="items-found-count" class="pill-badge">0 Items Detected</span>
+            </div>
+
+            <div class="reclaim-body">
+              <div class="reclaim-amount-box">
+                <div class="reclaim-meta-label">Selected For Cleanup</div>
+                <div id="total-reclaim-text" class="reclaim-number">0.00 GB</div>
+                <div class="reclaim-subtext">Instant disk space you can safely restore</div>
+              </div>
+
+              <div class="reclaim-safety-tags">
+                <div class="safety-indicator safe">
+                  <span class="badge-dot"></span>
+                  <span id="count-safe">0 Safe</span>
+                </div>
+                <div class="safety-indicator review">
+                  <span class="badge-dot"></span>
+                  <span id="count-review">0 Review</span>
+                </div>
+                <div class="safety-indicator caution">
+                  <span class="badge-dot"></span>
+                  <span id="count-caution">0 Caution</span>
+                </div>
+              </div>
+
+              <div class="quick-clean-row">
+                <button id="btn-select-all-safe" class="btn btn-outline-emerald">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Select Zero-Risk Caches
+                </button>
+                <button id="btn-deselect-all" class="btn btn-ghost">Deselect All</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Scanning State Overlay (Hidden by default) -->
+        <div id="scanning-overlay" class="scanning-state hidden">
+          <div class="radar-box">
+            <div class="radar-pulse"></div>
+            <div class="radar-center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+          </div>
+          <h3>Scanning System Storage...</h3>
+          <p id="scanning-status-step">Analyzing Ghost App versions, repacks, and build caches</p>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <section id="results-controls" class="controls-bar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-category="all">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+              <span>All Items</span>
+              <span class="tab-count" id="tab-all-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="ghost_apps">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <path d="M12 2a7 7 0 0 0-7 7v11l3.5-2 3.5 2 3.5-2 3.5 2V9a7 7 0 0 0-7-7z" />
+                <circle cx="9" cy="9" r="1.2" fill="currentColor" />
+                <circle cx="15" cy="9" r="1.2" fill="currentColor" />
+              </svg>
+              <span>Ghost Apps</span>
+              <span class="tab-count" id="tab-ghost-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="media_gaming">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <rect x="2" y="6" width="20" height="12" rx="4" />
+                <line x1="6" y1="12" x2="10" y2="12" />
+                <line x1="8" y1="10" x2="8" y2="14" />
+                <circle cx="15" cy="13" r="1" fill="currentColor" />
+                <circle cx="18" cy="11" r="1" fill="currentColor" />
+              </svg>
+              <span>Media & Gaming</span>
+              <span class="tab-count" id="tab-gaming-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="browser_caches">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              <span>Browser Caches</span>
+              <span class="tab-count" id="tab-browser-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="system_bloat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              <span>System Junk</span>
+              <span class="tab-count" id="tab-system-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="caches">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <span>Temp & Packages</span>
+              <span class="tab-count" id="tab-cache-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="archives">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+              <span>Installers & Repacks</span>
+              <span class="tab-count" id="tab-archive-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="dev_junk">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span>Dev Builds</span>
+              <span class="tab-count" id="tab-dev-count">0</span>
+            </button>
+            <button class="filter-tab" data-category="virtual_disks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-svg">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                <line x1="6" y1="6" x2="6.01" y2="6" />
+                <line x1="6" y1="18" x2="6.01" y2="18" />
+              </svg>
+              <span>VMs & Emulators</span>
+              <span class="tab-count" id="tab-vm-count">0</span>
+            </button>
+          </div>
+
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input type="text" id="filter-search" placeholder="Search path or name..." />
+          </div>
+        </section>
+
+        <!-- Dynamic Storage Items Container -->
+        <section id="items-container" class="items-list-container">
+          <!-- Populated dynamically via JS -->
+          <div class="empty-state">
+            <div class="empty-graphic">
+              <svg viewBox="0 0 120 120" fill="none" class="graphic-svg">
+                <circle cx="60" cy="60" r="55" stroke="rgba(6, 182, 212, 0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+                <circle cx="60" cy="60" r="34" stroke="rgba(139, 92, 246, 0.25)" stroke-width="2" />
+                <circle cx="60" cy="60" r="21" fill="rgba(6, 182, 212, 0.08)" stroke="var(--accent-cyan)" stroke-width="2" />
+                <path d="M60 48v24M48 60h24" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" />
+                <circle cx="95" cy="40" r="4" fill="var(--accent-emerald)" />
+                <circle cx="28" cy="82" r="3.5" fill="var(--accent-purple)" />
+              </svg>
+            </div>
+            <h3>Ready for Deep Scan</h3>
+            <p>Click "Scan Drive" above to run native disk traversal and uncover hidden gigabytes.</p>
+          </div>
+        </section>
+        </div>
+        <!-- End System Cleaner View -->
+
+        <!-- Duplicate Hunter View -->
+        <div id="view-duplicates" class="app-view hidden">
+          <!-- Overview Hero Section (1fr : 1.618fr Golden Section Split) -->
+          <section class="overview-grid">
+            <!-- Target Folders Config Card (Minor 38.2%) -->
+            <div class="glass-card dup-config-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>Target Scan Folders</span>
+                </div>
+                <button id="btn-add-folder" class="btn btn-ghost btn-sm" title="Add custom folder to duplicate scan">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Add Folder</span>
+                </button>
+              </div>
+
+              <div class="dup-config-body">
+                <div id="dup-target-chips" class="target-chips-container">
+                  <!-- Rendered dynamically via JS -->
+                </div>
+
+                <div class="dup-threshold-row">
+                  <span class="threshold-label">Minimum File Size:</span>
+                  <div class="threshold-options">
+                    <button class="threshold-btn" data-mb="0.5">500 KB</button>
+                    <button class="threshold-btn active" data-mb="1">1 MB</button>
+                    <button class="threshold-btn" data-mb="10">10 MB</button>
+                    <button class="threshold-btn" data-mb="50">50 MB</button>
+                  </div>
+                </div>
+
+                <button id="btn-run-dup-scan" class="btn btn-primary btn-full">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-spin-target">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <span id="btn-dup-scan-text">Find Duplicate Files</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Duplicate Potential Summary Card (Major 61.8%) -->
+            <div class="glass-card reclaim-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  <span>Wasted Duplicate Space</span>
+                </div>
+                <span id="dup-clusters-count" class="pill-badge">0 Clusters Found</span>
+              </div>
+
+              <div class="reclaim-body">
+                <div class="reclaim-amount-box">
+                  <div class="reclaim-meta-label">Selected For Deduplication</div>
+                  <div id="dup-total-reclaim-text" class="reclaim-number">0.00 GB</div>
+                  <div class="reclaim-subtext">Safe space you can reclaim (oldest original file is always preserved)</div>
+                </div>
+
+                <div class="reclaim-safety-tags">
+                  <div class="safety-indicator safe">
+                    <span class="badge-dot"></span>
+                    <span id="dup-scanned-stats">0 Files Scanned</span>
+                  </div>
+                  <div class="safety-indicator review">
+                    <span class="badge-dot"></span>
+                    <span id="dup-selected-count">0 Copies Selected</span>
+                  </div>
+                </div>
+
+                <div class="quick-clean-row">
+                  <button id="btn-dup-select-all" class="btn btn-outline-emerald">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Select All Duplicates (Preserve Originals)
+                  </button>
+                  <button id="btn-dup-deselect-all" class="btn btn-ghost">Deselect All</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Duplicate Groups Container -->
+          <section id="duplicate-groups-container" class="items-list-container">
+            <div class="empty-state">
+              <div class="empty-graphic">
+                <svg viewBox="0 0 120 120" fill="none" class="graphic-svg">
+                  <rect x="38" y="38" width="50" height="50" rx="8" stroke="rgba(6, 182, 212, 0.25)" stroke-width="2" stroke-dasharray="4 4" />
+                  <rect x="26" y="26" width="50" height="50" rx="8" stroke="var(--accent-cyan)" stroke-width="2" fill="rgba(6, 182, 212, 0.08)" />
+                  <path d="M40 48h22M40 56h15" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" />
+                  <circle cx="85" cy="85" r="4" fill="var(--accent-emerald)" />
+                </svg>
+              </div>
+              <h3>Duplicate Hunter Ready</h3>
+              <p>Configure folders above and run cryptographic deduplication to eliminate identical clones.</p>
+            </div>
+          </section>
+        </div>
+        <!-- End Duplicate Hunter View -->
+      </main>
+
+      <!-- Sticky Bottom Action Footer -->
+      <footer class="app-footer">
+        <div class="footer-info">
+          <span class="selected-summary">
+            Selected: <strong id="footer-selected-count">0 items</strong> (<strong id="footer-selected-size" class="text-emerald">0.00 GB</strong>)
+          </span>
+          <span class="protection-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Safe Delete Guaranteed
+          </span>
+        </div>
+
+        <div class="footer-cta">
+          <button id="btn-clean" class="btn btn-primary" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            <span id="btn-clean-text">Clean Selected (0.00 GB)</span>
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="clean-modal" class="modal-backdrop hidden">
+      <div class="modal-box glass-card">
+        <div class="modal-header">
+          <div class="modal-icon-badge danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+          <div class="modal-headings">
+            <h3>Confirm Storage Clean</h3>
+            <p>You are about to permanently delete the following selected items:</p>
+          </div>
+          <button id="modal-close" class="modal-close-btn">&times;</button>
+        </div>
+
+        <div id="modal-items-list" class="modal-items-preview">
+          <!-- Dynamic items preview -->
+        </div>
+
+        <div class="modal-summary-pill">
+          <span>Total Space to Reclaim:</span>
+          <strong id="modal-total-size" class="text-emerald">0.00 GB</strong>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btn-cancel-clean" class="btn btn-secondary">Cancel</button>
+          <button id="btn-confirm-clean" class="btn btn-danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Proceed with Clean
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Celebration Toast / Modal -->
+    <div id="success-modal" class="modal-backdrop hidden">
+      <div class="modal-box glass-card celebration-box">
+        <div class="celebration-graphic">
+          <svg viewBox="0 0 80 80" fill="none" class="celebration-svg">
+            <circle cx="40" cy="40" r="38" stroke="rgba(16, 185, 129, 0.25)" stroke-width="2" stroke-dasharray="4 4" />
+            <circle cx="40" cy="40" r="28" fill="url(#celebrateGrad)" />
+            <path d="M29 40l8 8 15-15" stroke="#07090e" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+            <defs>
+              <linearGradient id="celebrateGrad" x1="12" y1="12" x2="68" y2="68" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="100%" stop-color="#06b6d4" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h2>Storage Relief Achieved!</h2>
+        <p class="celebration-sub">Your system drive is now lighter and faster.</p>
+        <div class="reclaimed-trophy">
+          <span class="trophy-label">Reclaimed Space:</span>
+          <span id="celebration-reclaimed-text" class="trophy-amount">+0.00 GB</span>
+        </div>
+        <button id="btn-celebration-close" class="btn btn-primary">Done</button>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+  </body>
+</html>
