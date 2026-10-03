@@ -1,39 +1,33 @@
-# Byte-compiled / optimized / DLL files
+# Byte-compiled
 __pycache__/
 *.py[cod]
 *$py.class
 
-# PyInstaller & Build artifacts
-build/
-dist/
-*.manifest
-*.spec
-
-# Keep compiled release distribution executables if committed
-!StorageRelief.exe
-!StorageRelief_Setup.exe
-
-# Inno Setup output
-_IS_temp/
-
-# Virtual Environments
+# Virtual environments
 venv/
 .venv/
 env/
-ENV/
+.env
 
-# IDE / Editor configuration
-.idea/
+# Distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDE
 .vscode/
+.idea/
 *.swp
-*.swo
 
-# OS specific files
-Thumbs.db
-Desktop.ini
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
 .DS_Store
-
-# Temporary & Log files
-*.log
-scratch/
-tmp/
+Thumbs.db
