@@ -5,11 +5,7 @@ echo   StorageRelief (Python Edition) - Launcher
 echo ===================================================
 echo.
 
-if exist "%~dp0main.py" (
-    cd /d "%~dp0"
-) else (
-    cd /d "%~dp0.."
-)
+cd /d "%~dp0"
 python main.py %*
 
 if %errorlevel% neq 0 (
