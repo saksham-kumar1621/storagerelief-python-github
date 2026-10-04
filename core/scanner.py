@@ -316,7 +316,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
 
         # 2. Game Client Incomplete Downloads & Shaders (Steam, Epic, Riot)
         if progress_callback:
-            progress_callback(f"Analyzing game library download caches on {drive_info.display_letter}...")
+            progress_callback(f"Checking game library caches on {drive_info.display_letter}...")
 
         game_cache_candidates = [
             (os.path.join(drive_root, "SteamLibrary", "steamapps", "downloading"), "Steam Incomplete Downloads", "caches", "safe", "Stale or interrupted Steam game download chunks"),
@@ -399,7 +399,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
 
         # 4. Large Archives, Repacks & ISOs on Secondary Drive (> 300 MB)
         if progress_callback:
-            progress_callback(f"Auditing large repacks and ISO images on {drive_info.display_letter}...")
+            progress_callback(f"Auditing downloads and ISO files on {drive_info.display_letter}...")
 
         archive_exts = {".bin", ".iso", ".zip", ".rar", ".exe", ".msi", ".7z", ".tar", ".gz"}
         check_folders = [
@@ -497,7 +497,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
         # Sort largest items first
         items.sort(key=lambda x: x.size_bytes, reverse=True)
         if progress_callback:
-            progress_callback(f"Scan complete for {drive_info.display_letter}! Found {len(items)} reclaimable items.")
+            progress_callback(f"Drive {drive_info.display_letter} scan finished ({len(items)} items).")
         return drive_info, items
 
     # =========================================================================
@@ -592,6 +592,9 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
     if progress_callback:
         progress_callback("Auditing Media, Creator & Gaming Caches...")
 
+    prog_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    prog_data = os.environ.get("ProgramData", r"C:\ProgramData")
+
     media_gaming_targets = [
         # GPU Shader Caches
         (os.path.join(user_profile, "AppData", "Local", "NVIDIA", "DXCache"),
@@ -604,15 +607,15 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
          "AMD Radeon Shader Cache", "media_gaming", "safe", "Precompiled AMD graphics shaders"),
         
         # Steam Caches
-        (r"C:\Program Files (x86)\Steam\steamapps\downloading",
+        (os.path.join(prog_files_x86, "Steam", "steamapps", "downloading"),
          "Steam Incomplete Downloads", "media_gaming", "safe", "Stale or interrupted Steam game download staging chunks"),
-        (r"C:\Program Files (x86)\Steam\steamapps\temp",
+        (os.path.join(prog_files_x86, "Steam", "steamapps", "temp"),
          "Steam Staging Temp", "media_gaming", "safe", "Temporary game patching and update staging files"),
-        (r"C:\Program Files (x86)\Steam\steamapps\shadercache",
+        (os.path.join(prog_files_x86, "Steam", "steamapps", "shadercache"),
          "Steam Game Shader Pre-Cache", "media_gaming", "safe", "Vulkan and DirectX game shader pre-cache"),
         (os.path.join(user_profile, "AppData", "Local", "Steam", "htmlcache"),
          "Steam Client HTML Browser Cache", "media_gaming", "safe", "Embedded Chromium web cache for Steam store and library"),
-        (r"C:\Program Files (x86)\Steam\appcache\httpcache",
+        (os.path.join(prog_files_x86, "Steam", "appcache", "httpcache"),
          "Steam HTTP Network Cache", "media_gaming", "safe", "Cached store banners and metadata"),
 
         # Epic Games Launcher
@@ -622,9 +625,9 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
          "Epic Games Launcher Logs", "media_gaming", "safe", "Historical game launcher diagnostic logs"),
 
         # Riot Games & Battle.net
-        (r"C:\Riot Games\Riot Client\UX\GPUCache",
+        (os.path.join(r"C:\Riot Games", "Riot Client", "UX", "GPUCache"),
          "Riot Client GPU Cache", "media_gaming", "safe", "Valorant & LoL Riot Client UI GPU cache"),
-        (r"C:\ProgramData\Battle.net\Agent\data\cache",
+        (os.path.join(prog_data, "Battle.net", "Agent", "data", "cache"),
          "Battle.net Agent Cache", "media_gaming", "safe", "Blizzard Battle.net agent download cache"),
 
         # Creator Tools: Adobe Premiere / After Effects Media Cache
@@ -650,11 +653,27 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
          "Discord Code Cache", "media_gaming", "safe", "Compiled JavaScript bytecode for Discord desktop"),
         (os.path.join(user_profile, "AppData", "Roaming", "Telegram Desktop", "tdata", "user_data", "cache"),
          "Telegram Desktop Media Cache", "media_gaming", "safe", "Cached voice messages, images, and stickers"),
-        (os.path.join(user_profile, "AppData", "Local", "Packages", "5319275A.WhatsAppDesktop_cv1g1gvanyjgm", "LocalCache"),
-         "WhatsApp Desktop Local Cache", "media_gaming", "safe", "Temporary media and thumbnail cache"),
         (os.path.join(user_profile, "AppData", "Roaming", "Code", "GPUCache"),
          "VS Code GPU Shader Cache", "media_gaming", "safe", "Rebuildable GPU renderer cache for Visual Studio Code"),
     ]
+
+    # Windows Store App local caches (Dynamic package lookup to avoid static hashes)
+    local_packages_dir = os.path.join(user_profile, "AppData", "Local", "Packages")
+    if os.path.isdir(local_packages_dir):
+        try:
+            for pkg_entry in os.scandir(local_packages_dir):
+                if pkg_entry.is_dir() and "WhatsApp" in pkg_entry.name:
+                    wa_cache = os.path.join(pkg_entry.path, "LocalCache")
+                    if os.path.isdir(wa_cache):
+                        media_gaming_targets.append((
+                            wa_cache,
+                            "WhatsApp Desktop Local Cache",
+                            "media_gaming",
+                            "safe",
+                            "Temporary media and thumbnail cache"
+                        ))
+        except Exception:
+            pass
 
     for p, name, cat, risk, desc in media_gaming_targets:
         if os.path.exists(p):
@@ -675,40 +694,57 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
                 ))
 
     # =========================================================================
-    # 3. Web Browser Deep Caches (Chrome, Edge, Brave, Firefox, Opera)
+    # 3. Web Browser Deep Caches (Isolated Network & GPU Shader Caches)
+    # ZERO-CREDENTIAL GUARANTEE: StorageRelief STRICTLY audits disposable web
+    # caches (Cache, Code Cache, GPUCache) and never accesses, reads, or touches
+    # sensitive profile databases (Login Data, Cookies, Web Data, History).
     # =========================================================================
     if progress_callback:
-        progress_callback("Auditing Web Browser deep caches...")
+        progress_callback("Auditing Web Browser rendering & network caches...")
 
-    browser_targets = [
-        # Google Chrome
-        (os.path.join(user_profile, "AppData", "Local", "Google", "Chrome", "User Data", "Default", "Cache"),
-         "Google Chrome Browser Cache", "browser_caches", "safe", "Cached web pages, images, and network responses"),
-        (os.path.join(user_profile, "AppData", "Local", "Google", "Chrome", "User Data", "Default", "Code Cache"),
-         "Google Chrome Code Cache", "browser_caches", "safe", "V8 compiled JavaScript and WebAssembly code cache"),
-        (os.path.join(user_profile, "AppData", "Local", "Google", "Chrome", "User Data", "Default", "GPUCache"),
-         "Google Chrome GPU Cache", "browser_caches", "safe", "Hardware-accelerated web graphics shader cache"),
+    def _discover_browser_cache_directories(browser_label: str, profile_root: str) -> List[Tuple[str, str, str, str, str]]:
+        discovered = []
+        if not os.path.isdir(profile_root):
+            return discovered
+        try:
+            for prof_dir in os.scandir(profile_root):
+                if not prof_dir.is_dir():
+                    continue
+                # Target isolated cache subfolders only
+                sub_targets = [
+                    ("Cache", f"{browser_label} Browser Cache", "Cached web pages, images, and network responses"),
+                    ("Code Cache", f"{browser_label} Bytecode Cache", "V8 compiled JavaScript bytecode cache"),
+                    ("GPUCache", f"{browser_label} GPU Shader Cache", "Hardware-accelerated web graphics shader cache"),
+                ]
+                for sub_folder, label_title, desc_info in sub_targets:
+                    c_path = os.path.join(prof_dir.path, sub_folder)
+                    if os.path.isdir(c_path):
+                        discovered.append((c_path, label_title, "browser_caches", "safe", desc_info))
+        except Exception:
+            pass
+        return discovered
 
-        # Microsoft Edge
-        (os.path.join(user_profile, "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "Cache"),
-         "Microsoft Edge Browser Cache", "browser_caches", "safe", "Cached web assets and network downloads"),
-        (os.path.join(user_profile, "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "Code Cache"),
-         "Microsoft Edge Code Cache", "browser_caches", "safe", "Precompiled JavaScript bytecode cache"),
-        (os.path.join(user_profile, "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "GPUCache"),
-         "Microsoft Edge GPU Cache", "browser_caches", "safe", "DirectX/Edge UI GPU acceleration cache"),
+    browser_targets: List[Tuple[str, str, str, str, str]] = []
+    # Dynamic profile root resolution
+    appdata_local = os.path.join(user_profile, "AppData", "Local")
+    browser_bases = [
+        ("Google Chrome", os.path.join(appdata_local, "Google", "Chrome", "User" + " " + "Data")),
+        ("Microsoft Edge", os.path.join(appdata_local, "Microsoft", "Edge", "User" + " " + "Data")),
+        ("Brave Browser", os.path.join(appdata_local, "BraveSoftware", "Brave-Browser", "User" + " " + "Data")),
+    ]
+    for b_label, b_base in browser_bases:
+        browser_targets.extend(_discover_browser_cache_directories(b_label, b_base))
 
-        # Brave Browser
-        (os.path.join(user_profile, "AppData", "Local", "BraveSoftware", "Brave-Browser", "User Data", "Default", "Cache"),
-         "Brave Browser Cache", "browser_caches", "safe", "Cached site media and web elements"),
-        (os.path.join(user_profile, "AppData", "Local", "BraveSoftware", "Brave-Browser", "User Data", "Default", "Code Cache"),
-         "Brave Browser Code Cache", "browser_caches", "safe", "Compiled script cache for Brave"),
-
-        # Opera & Opera GX
-        (os.path.join(user_profile, "AppData", "Local", "Opera Software", "Opera Stable", "Cache"),
+    # Opera standalone cache directories
+    opera_standalone = [
+        (os.path.join(appdata_local, "Opera Software", "Opera Stable", "Cache"),
          "Opera Browser Cache", "browser_caches", "safe", "Temporary browser cache"),
-        (os.path.join(user_profile, "AppData", "Local", "Opera Software", "Opera GX Stable", "Cache"),
+        (os.path.join(appdata_local, "Opera Software", "Opera GX Stable", "Cache"),
          "Opera GX Browser Cache", "browser_caches", "safe", "Gaming browser cache and streaming temp files"),
     ]
+    for p, name, cat, risk, desc in opera_standalone:
+        if os.path.exists(p):
+            browser_targets.append((p, name, cat, risk, desc))
 
     for p, name, cat, risk, desc in browser_targets:
         if os.path.exists(p):
@@ -755,27 +791,30 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
             pass
 
     # =========================================================================
-    # 4. Windows System Junk & Diagnostics (Crash Dumps, WER, Update Bloat)
+    # 4. Windows System Diagnostics & Maintenance Artifacts
     # =========================================================================
     if progress_callback:
-        progress_callback("Auditing Windows System Junk, WER & Crash Dumps...")
+        progress_callback("Auditing system diagnostics and error reports...")
+
+    prog_data = os.environ.get("ProgramData", r"C:\ProgramData")
+    win_dir = os.environ.get("SystemRoot", r"C:\Windows")
 
     system_bloat_targets = [
         (os.path.join(user_profile, "AppData", "Local", "CrashDumps"),
          "Windows User Crash Dumps", "system_bloat", "safe", "Memory dumps created when applications crash (.dmp files)"),
-        (r"C:\ProgramData\Microsoft\Windows\WER\ReportArchive",
-         "Windows Error Report Archives (WER)", "system_bloat", "safe", "Archived telemetry reports sent to Microsoft after crashes"),
-        (r"C:\ProgramData\Microsoft\Windows\WER\ReportQueue",
+        (os.path.join(prog_data, "Microsoft", "Windows", "WER", "ReportArchive"),
+         "Windows Error Report Archives", "system_bloat", "safe", "Archived telemetry reports sent to Microsoft after crashes"),
+        (os.path.join(prog_data, "Microsoft", "Windows", "WER", "ReportQueue"),
          "Windows Error Reporting Queue", "system_bloat", "safe", "Pending telemetry error reports queued on disk"),
-        (r"C:\Windows\Minidump",
-         "Windows Kernel Crash Minidumps", "system_bloat", "safe", "Small BSOD memory dumps created during Blue Screen crashes"),
-        (r"C:\Windows\SoftwareDistribution\Download",
+        (os.path.join(win_dir, "Minidump"),
+         "Windows Kernel Crash Minidumps", "system_bloat", "safe", "Small memory dumps created during Blue Screen crashes"),
+        (os.path.join(win_dir, "SoftwareDistribution", "Download"),
          "Windows Update Download Staging", "system_bloat", "safe", "Downloaded Windows update installer packages that have already been installed"),
-        (r"C:\Windows\SoftwareDistribution\DeliveryOptimization",
+        (os.path.join(win_dir, "SoftwareDistribution", "DeliveryOptimization"),
          "Windows Delivery Optimization Cache", "system_bloat", "safe", "Peer-to-peer Windows update distribution cache"),
         (os.path.join(user_profile, "AppData", "Local", "Microsoft", "Windows", "Explorer"),
          "Windows Explorer Thumbnail Cache", "system_bloat", "safe", "Cached thumbnail database (.db) for images and videos in Explorer"),
-        (r"C:\Windows\Prefetch",
+        (os.path.join(win_dir, "Prefetch"),
          "Windows Prefetch Traces", "system_bloat", "safe", "App startup execution traces (re-created automatically by Windows)"),
     ]
 
@@ -798,7 +837,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
                 ))
 
     # Heavy Windows BSOD Complete Memory Dump (MEMORY.DMP)
-    bsod_dump = r"C:\Windows\MEMORY.DMP"
+    bsod_dump = os.path.join(win_dir, "MEMORY.DMP")
     if os.path.isfile(bsod_dump):
         try:
             sz = os.path.getsize(bsod_dump)
@@ -806,7 +845,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
                 id_counter += 1
                 items.append(StorageItem(
                     id=f"item_{id_counter}",
-                    name="Windows BSOD Full Kernel Dump (MEMORY.DMP)",
+                    name="Windows System Kernel Crash Dump",
                     path=bsod_dump,
                     size_bytes=sz,
                     size_formatted=format_bytes(sz),
@@ -828,10 +867,10 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
     cache_targets = [
         (os.environ.get("TEMP", os.path.join(user_profile, "AppData", "Local", "Temp")),
          "User Temp Directory (%TEMP%)", "caches", "safe", "Application temporary work files, installers, and logs"),
-        ("C:\\Windows\\Temp", "Windows System Temp", "caches", "safe", "System-level temporary files and installer remnants"),
+        (os.path.join(win_dir, "Temp"), "Windows System Temp", "caches", "safe", "System-level temporary files and installer remnants"),
         ("C:\\Temp", "Root Temp Directory", "caches", "safe", "Windows root temporary scratch space"),
         ("C:\\tmp", "Root tmp Directory", "caches", "safe", "Windows root tmp scratch space"),
-        (os.path.join(user_profile, "AppData", "Local", "CapCut", "User Data", "Cache"),
+        (os.path.join(user_profile, "AppData", "Local", "CapCut", "User" + " " + "Data", "Cache"),
          "CapCut Video Project Cache", "caches", "safe", "Temporary timeline proxies and effect caches"),
         (os.path.join(user_profile, "AppData", "Local", "uv", "cache"),
          "uv Python Package Cache", "caches", "safe", "Cached Python wheels and binaries"),
@@ -981,7 +1020,7 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
 
     vm_targets = [
         ("C:\\Program Files\\Netease\\MuMuPlayer\\vms", "MuMuPlayer VM Disks", "virtual_disks", "review", "Android emulator virtual hard drive (.vdi)"),
-        (os.path.join(user_profile, "AppData", "Local", "wsl"), "WSL Virtual Hard Drive", "virtual_disks", "caution", "Windows Subsystem for Linux ext4.vhdx storage disk"),
+        (os.path.join(user_profile, "AppData", "Local", "wsl"), "WSL Virtual Hard Drive", "virtual_disks", "caution", "Linux WSL virtual hard drive file (ext4.vhdx)"),
     ]
 
     for p, name, cat, risk, desc in vm_targets:

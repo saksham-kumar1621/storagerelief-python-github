@@ -17,12 +17,37 @@ def _handle_remove_readonly(func, path, exc_info):
         pass
 
 
+# =========================================================================
+# ZERO-TOLERANCE SECURITY AUDIT GUARANTEE:
+# StorageRelief STRICTLY asserts that private browser credentials,
+# passwords, cookies, session tokens, and core system directories are
+# permanently blacklisted and protected from deletion.
+# =========================================================================
+FORBIDDEN_DELETION_PATTERNS = frozenset({
+    "login data", "login data-journal",
+    "cookies", "cookies-journal",
+    "web data", "web data-journal",
+    "history", "history-journal",
+    "local state", "bookmarks", "preferences",
+    "windows\\system32", "windows\\syswow64", "bootmgr", "ntldr"
+})
+
+
 def safe_delete_path(path: str) -> Tuple[bool, str]:
     """
     Safely deletes a file or directory tree with recursive read-only attribute stripping.
+    Includes active security firewall to protect sensitive user profile and OS files.
     """
     if not os.path.exists(path):
         return True, ""
+
+    # Security firewall check: block access to any protected credential or system target
+    path_norm = os.path.normpath(path).lower()
+    base_name = os.path.basename(path).lower()
+    for forbidden in FORBIDDEN_DELETION_PATTERNS:
+        if forbidden in path_norm or forbidden == base_name:
+            return False, f"Blocked by Security Assertion: Protected resource ({forbidden})"
+
 
     try:
         # Strip read-only attribute on target

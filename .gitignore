@@ -9,11 +9,18 @@ venv/
 env/
 .env
 
-# Distribution
+# Distribution & Executables (Releases are distributed via GitHub Releases)
 dist/
 build/
 *.egg-info/
 *.egg
+*.exe
+*.dll
+*.so
+*.dylib
+*.manifest
+*.spec
+_IS_temp/
 
 # IDE
 .vscode/

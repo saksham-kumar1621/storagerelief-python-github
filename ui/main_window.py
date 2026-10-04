@@ -49,7 +49,7 @@ class CleanWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("StorageRelief — Smart Windows Storage Optimizer (Python Edition)")
+        self.setWindowTitle("StorageRelief - Windows Storage Optimizer")
         self.resize(1120, 780)
         self.setMinimumSize(960, 680)
 
@@ -104,11 +104,10 @@ class MainWindow(QMainWindow):
         title_col.setSpacing(1)
         h_title = QLabel("StorageRelief")
         h_title.setObjectName("lblHeroTitle")
-        h_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #ffffff;")
         title_col.addWidget(h_title)
 
         v_lbl = QLabel("v1.0 • Python Native Engine")
-        v_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #38bdf8;")
+        v_lbl.setObjectName("lblSubHeader")
         title_col.addWidget(v_lbl)
         brand_layout.addLayout(title_col)
         header_layout.addLayout(brand_layout)
@@ -128,11 +127,11 @@ class MainWindow(QMainWindow):
         sp_layout.setSpacing(6)
 
         self.status_dot = QLabel("●")
-        self.status_dot.setStyleSheet("color: #10b981; font-size: 10px;")
+        self.status_dot.setObjectName("lblStatusDot")
         sp_layout.addWidget(self.status_dot)
 
         self.status_lbl = QLabel("Ready")
-        self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #cbd5e1;")
+        self.status_lbl.setObjectName("lblStatusText")
         sp_layout.addWidget(self.status_lbl)
         header_layout.addWidget(self.status_pill)
 
@@ -167,10 +166,9 @@ class MainWindow(QMainWindow):
             vbox = QVBoxLayout()
             vbox.setSpacing(2)
             k_lbl = QLabel(title)
-            k_lbl.setProperty("class", "lblMetricKey")
-            k_lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;")
+            k_lbl.setObjectName("lblMetricKey")
             v_lbl = QLabel("0.0 GB")
-            v_lbl.setStyleSheet("font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', Consolas, monospace; color: #f8fafc;")
+            v_lbl.setObjectName("lblMetricVal")
             setattr(self, val_attr, v_lbl)
             vbox.addWidget(k_lbl)
             vbox.addWidget(v_lbl)
@@ -212,11 +210,11 @@ class MainWindow(QMainWindow):
         rb_layout.setSpacing(4)
 
         rb_title = QLabel("SELECTED TO RECLAIM")
-        rb_title.setStyleSheet("font-size: 10px; font-weight: 800; color: #34d399; letter-spacing: 0.5px;")
+        rb_title.setObjectName("lblReclaimTitle")
         rb_layout.addWidget(rb_title)
 
         self.lbl_hero_reclaim = QLabel("0.00 GB")
-        self.lbl_hero_reclaim.setStyleSheet("font-size: 24px; font-weight: 900; color: #10b981; font-family: monospace;")
+        self.lbl_hero_reclaim.setObjectName("lblHeroReclaim")
         rb_layout.addWidget(self.lbl_hero_reclaim)
 
         # Quick select buttons
@@ -311,17 +309,17 @@ class MainWindow(QMainWindow):
         es_layout = QVBoxLayout(self.empty_state)
         es_layout.setAlignment(Qt.AlignCenter)
         es_icon = QLabel("[OK]")
-        es_icon.setStyleSheet("font-size: 20px; font-weight: 800; color: #10b981;")
+        es_icon.setObjectName("lblModalTotal")
         es_icon.setAlignment(Qt.AlignCenter)
         es_layout.addWidget(es_icon)
 
         self.es_title = QLabel("No storage waste in this category!")
-        self.es_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #ffffff;")
+        self.es_title.setObjectName("lblHeroTitle")
         self.es_title.setAlignment(Qt.AlignCenter)
         es_layout.addWidget(self.es_title)
 
         es_desc = QLabel("Your selected category is completely clean. Switch tabs or run a fresh scan anytime.")
-        es_desc.setStyleSheet("font-size: 12px; color: #94a3b8;")
+        es_desc.setObjectName("lblSubHeader")
         es_desc.setAlignment(Qt.AlignCenter)
         es_layout.addWidget(es_desc)
 
@@ -345,11 +343,11 @@ class MainWindow(QMainWindow):
         f_left = QVBoxLayout()
         f_left.setSpacing(2)
         self.lbl_footer_summary = QLabel("Selected: 0 items (0.00 GB)")
-        self.lbl_footer_summary.setStyleSheet("font-size: 13px; font-weight: 700; color: #f8fafc;")
+        self.lbl_footer_summary.setObjectName("lblModalItemName")
         f_left.addWidget(self.lbl_footer_summary)
 
         badge_safe = QLabel("Safe Deletion Engine • Recursive Read-Only Unlock Guaranteed")
-        badge_safe.setStyleSheet("font-size: 11px; color: #10b981; font-weight: 600;")
+        badge_safe.setObjectName("lblModalItemSize")
         f_left.addWidget(badge_safe)
         f_layout.addLayout(f_left)
 

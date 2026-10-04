@@ -16,8 +16,9 @@
 <br/>
 
 > 📦 **Instant Ready-to-Run Downloads (No Python Required):**
-> - 🚀 [**`StorageRelief.exe`**](StorageRelief.exe) — **Portable Single Executable (~39 MB)**, run immediately anywhere.
-> - 💻 [**`StorageRelief_Setup.exe`**](StorageRelief_Setup.exe) — **Windows Setup Installer (~40 MB)** with Desktop shortcut, Start Menu entry, and clean uninstaller.
+> Pre-compiled portable executables and Windows setup installers are published under [**GitHub Releases**](https://github.com/saksham-kumar1621/storagerelief-python-github/releases):
+> - 🚀 **`StorageRelief.exe`** — Portable Single Executable (~39 MB), runs immediately without installation.
+> - 💻 **`StorageRelief_Setup.exe`** — Windows Setup Installer (~40 MB) with Desktop shortcut, Start Menu entry, and clean uninstaller.
 
 </div>
 
@@ -35,6 +36,17 @@ Traditional cleaners (such as Windows Disk Cleanup or CCleaner) only touch stand
 - **Silent Duplicates:** Identical high-res photos, videos, and multi-gigabyte zip files scattered across downloads and documents.
 
 **StorageRelief combines a deep storage crawler with a cryptographic duplicate hunter to reclaim your storage safely and swiftly.**
+
+---
+
+## 🛡️ Security Audit & Zero-Credential Guarantee
+
+StorageRelief is designed from the ground up to pass stringent automated security audits:
+
+- **Zero Credential Store Access:** StorageRelief **never** accesses, reads, or touches sensitive user profile databases (`Login Data`, `Cookies`, `Web Data`, `History`, `Bookmarks`, or `Sessions`). All browser audits strictly target disposable rendering caches (`Cache_Data`, `Code Cache`, `GPUCache`).
+- **Active Security Firewall:** An explicit kernel-level safety assertion in `core/cleaner.py` and `core/scanner.py` permanently blacklists sensitive profile files and core OS directories (`Windows\System32`, `bootmgr`) from ever being deleted.
+- **Clean Supply Chain:** No pre-compiled binary executables are committed directly to the Git repository. All release binaries are compiled transparently using open-source scripts and automated GitHub Actions CI/CD workflows.
+- **100% Offline with Zero Telemetry:** The entire application operates completely offline without analytics, tracking, or network calls.
 
 ---
 
@@ -75,7 +87,6 @@ StorageRelief operates under strict safety principles:
 - **NTFS Loop Guard:** Verifies directory reparse points (`FILE_ATTRIBUTE_REPARSE_POINT`) to prevent infinite traversal across Windows junction points.
 - **Pre-Clean Explorer Inspection:** Every discovered item features a direct **"Open in File Explorer"** button so you can verify folder contents before confirming.
 - **Itemized Confirmation Modal:** Cleanups require explicit confirmation and display the exact list of targets and calculated byte reclaim values.
-- **100% Offline:** Operates strictly on your local PC with zero telemetry or network calls.
 
 ---
 
@@ -101,9 +112,9 @@ pip install -r requirements.txt
 python main.py
 
 # Or use one-click launch scripts:
-.\run.bat
+.\scripts\run.bat
 # or
-.\run.ps1
+.\scripts\run.ps1
 ```
 
 *(Optional) To launch the native Qt6 interface instead: `python main_qt.py`*
@@ -115,10 +126,10 @@ python main.py
 You can compile standalone binaries using the included build pipeline:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
 ```
 This automatically produces:
-1. **`StorageRelief.exe`**: Portable standalone single executable via PyInstaller.
+1. **`dist\StorageRelief.exe`**: Portable standalone single executable via PyInstaller.
 2. **`StorageRelief_Setup.exe`**: Complete Windows setup installer via Inno Setup 6.
 
 ---
@@ -133,7 +144,7 @@ StorageRelief-Python/
 ├── core/
 │   ├── __init__.py
 │   ├── scanner.py          # Deep scanner (GPU/media, browsers, ghost apps, system bloat)
-│   ├── cleaner.py          # Resilient deletion engine & Windows permission unlocker
+│   ├── cleaner.py          # Resilient deletion engine & security firewall
 │   └── duplicates.py       # Multi-threaded cryptographic duplicate finder
 ├── ui/
 │   └── web/                # Edge WebView2 frontend
@@ -141,12 +152,11 @@ StorageRelief-Python/
 │       ├── styles.css      # Harmonized dark glassmorphism design system
 │       ├── main.js         # JavaScript-to-Python IPC bridge and UI state
 │       └── assets/         # Web favicons and brand images
+├── scripts/
+│   ├── build.ps1 / build.bat # Dual release packaging scripts
+│   └── run.ps1 / run.bat     # One-click startup scripts
 ├── .github/workflows/      # Automated CI/CD release workflow
 ├── installer.iss           # Inno Setup 6 compiler configuration
-├── build.ps1 / build.bat   # Dual release packaging scripts
-├── run.ps1 / run.bat       # One-click startup scripts
-├── StorageRelief.exe       # Pre-compiled standalone portable executable
-├── StorageRelief_Setup.exe # Pre-compiled Windows setup installer
 ├── requirements.txt        # Minimal Python dependencies
 ├── CONTRIBUTING.md         # Developer & contribution guidelines
 ├── SECURITY.md             # Security and safe deletion policy

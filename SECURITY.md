@@ -12,6 +12,15 @@ StorageRelief is designed with file integrity as its highest priority:
 
 ---
 
+## 🔒 Zero Browser Credential Access Guarantee
+
+StorageRelief specifically distinguishes between **disposable rendering caches** and **private user profile data**:
+
+- **Allowed Targets:** Only isolated rendering artifacts (`Cache\Cache_Data`, `Code Cache\js`, `GPUCache`).
+- **Permanently Blacklisted Files:** All private browser data (`Login Data`, `Login Data-journal`, `Cookies`, `Cookies-journal`, `Web Data`, `History`, `Bookmarks`, `Preferences`, `Local State`, `Sessions`) are strictly excluded.
+- **Active Deletion Firewall:** An internal security firewall in `core/cleaner.py` (`FORBIDDEN_DELETION_PATTERNS`) programmatically validates all paths and refuses deletion if any protected credential pattern is encountered.
+- **Transparent Open-Source Verification:** No pre-compiled binaries are stored in the git repository. All builds are generated directly from public Python source code.
+
 ## 🚨 Reporting a Vulnerability
 
 If you discover a potential security or data-loss vulnerability, please submit an issue or contact the project maintainers with:

@@ -262,4 +262,16 @@ QLabel#lblMetricKey {
     font-size: 11px;
     font-weight: 700;
 }
+
+QLabel#lblHeroTitle { font-size: 20px; font-weight: 800; color: #ffffff; }
+QLabel#lblSubHeader { font-size: 11px; font-weight: 600; color: #38bdf8; }
+QLabel#lblStatusDot { color: #10b981; font-size: 10px; }
+QLabel#lblStatusText { font-size: 12px; font-weight: 600; color: #cbd5e1; }
+QLabel#lblMetricKey { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+QLabel#lblMetricVal { font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', Consolas, monospace; color: #f8fafc; }
+QLabel#lblReclaimTitle { font-size: 10px; font-weight: 800; color: #34d399; letter-spacing: 0.5px; }
+QLabel#lblHeroReclaim { font-size: 24px; font-weight: 900; color: #10b981; font-family: monospace; }
+QLabel#lblModalTotal { font-size: 20px; font-weight: 800; color: #10b981; }
+QLabel#lblModalItemName { font-size: 13px; font-weight: 700; color: #f8fafc; }
+QLabel#lblModalItemSize { font-size: 11px; color: #10b981; font-weight: 600; }
 """

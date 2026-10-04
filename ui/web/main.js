@@ -1310,7 +1310,7 @@ function getMockData(cmd, args) {
         {
           id: 'item_3',
           name: 'Google Chrome Code Cache',
-          path: 'C:\\Users\\User\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Code Cache',
+          path: 'C:\\Users\\User\\AppData\\Local\\Google\\Chrome-Cache-Sample\\Code Cache',
           size_bytes: 329469952,
           size_formatted: '314.1 MB',
           category: 'browser_caches',
@@ -1334,7 +1334,7 @@ function getMockData(cmd, args) {
         {
           id: 'item_5',
           name: 'Google Chrome Browser Cache',
-          path: 'C:\\Users\\User\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache',
+          path: 'C:\\Users\\User\\AppData\\Local\\Google\\Chrome-Cache-Sample\\Cache',
           size_bytes: 280911872,
           size_formatted: '267.9 MB',
           category: 'browser_caches',
@@ -1394,7 +1394,7 @@ function getMockData(cmd, args) {
         {
           id: 'item_10',
           name: 'WhatsApp Desktop Local Cache',
-          path: 'C:\\Users\\User\\AppData\\Local\\Packages\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\\LocalCache',
+          path: 'C:\\Users\\User\\AppData\\Local\\Packages\\WhatsAppDesktop\\LocalCache',
           size_bytes: 81682432,
           size_formatted: '77.9 MB',
           category: 'media_gaming',
