@@ -3,8 +3,10 @@ import sys
 import stat
 import hashlib
 import ctypes
+import re
+import datetime
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Callable, Set, Any
+from typing import List, Dict, Optional, Callable, Set, Any, Tuple
 
 from core.scanner import format_bytes, is_reparse_point
 
@@ -44,16 +46,114 @@ class DuplicateScanResult:
     groups: List[DuplicateGroup]
 
 
+def score_originality(filepath: str, mtime: float = 0.0) -> float:
+    """
+    Intelligently scores how likely a file is to be the true 'Original' intended document
+    rather than an accidental duplicate or downloaded copy.
+    
+    Higher score = stronger confidence that this is the primary/original file.
+    Addresses audit critique: 'the assumption that older duplicate files are always the originals'.
+    """
+    score = 100.0
+    name = os.path.basename(filepath).lower()
+    norm_p = os.path.normpath(filepath).lower()
+
+    # 1. Penalize obvious copy markers and browser download collision suffixes
+    # Examples: "photo (1).png", "report - Copy.docx", "document_copy.pdf", "Copy of presentation.pptx"
+    copy_patterns = [
+        r"\(\d+\)",               # (1), (2), etc.
+        r"\[\d+\]",               # [1], [2], etc.
+        r" - copy",               # "file - Copy"
+        r"_copy",                 # "file_copy"
+        r"copy of",               # "Copy of file"
+        r"\(copy\)",              # "(copy)"
+        r"_duplicate",            # "_duplicate"
+    ]
+    for pattern in copy_patterns:
+        if re.search(pattern, name):
+            score -= 45.0
+            break
+
+    # 2. Prefer canonical user library directories over disposable/incoming scratchpads
+    if "\\documents\\" in norm_p or "\\documents" in norm_p:
+        score += 30.0
+    elif "\\pictures\\" in norm_p or "\\photos\\" in norm_p:
+        score += 30.0
+    elif "\\music\\" in norm_p or "\\videos\\" in norm_p:
+        score += 25.0
+    elif "\\desktop\\" in norm_p:
+        score += 15.0
+    elif "\\downloads\\" in norm_p:
+        # Downloads directory is overwhelmingly where duplicate collisions originate
+        score -= 30.0
+    elif "\\temp\\" in norm_p or "\\tmp\\" in norm_p or "\\appdata\\" in norm_p:
+        score -= 40.0
+
+    # 3. Path Depth: Shorter, cleaner directory structures are more likely canonical
+    path_depth = len(norm_p.split(os.sep))
+    score -= min(15.0, path_depth * 1.0)
+
+    # 4. Secondary tie-breaker: older modification time gets a slight boost if locations are equal
+    if mtime > 0:
+        # Modest micro-score scaling so it never overrides copy names or curated folder priorities
+        score -= (mtime / 1e11)
+
+    return score
+
+
+def verify_duplicate_integrity_before_delete(
+    duplicate_path: str,
+    sibling_paths: List[str],
+    expected_size: int
+) -> Tuple[bool, str]:
+    """
+    TOCTOU Pre-Deletion Integrity Verification:
+    Asserts that deleting this duplicate will NOT cause permanent total data loss:
+    1. Validates that the target duplicate file exists and hasn't changed size.
+    2. Validates that at least ONE other valid copy in the group still exists on disk
+       and has matching file size.
+    """
+    norm_dup = os.path.normpath(duplicate_path)
+    if not os.path.isfile(norm_dup):
+        return False, "Target duplicate file no longer exists on disk"
+
+    try:
+        if os.path.getsize(norm_dup) != expected_size:
+            return False, "Target duplicate file size changed since scanning (TOCTOU violation)"
+    except Exception as e:
+        return False, f"Cannot verify duplicate file: {e}"
+
+    # Search for at least one surviving sibling copy
+    surviving_copies = 0
+    for sib in sibling_paths:
+        norm_sib = os.path.normpath(sib)
+        if norm_sib.lower() == norm_dup.lower():
+            continue
+        if os.path.isfile(norm_sib):
+            try:
+                if os.path.getsize(norm_sib) == expected_size:
+                    surviving_copies += 1
+            except Exception:
+                pass
+
+    if surviving_copies == 0:
+        return False, "ABORTED: No surviving original or sibling copy found on disk! Deletion stopped to prevent total data loss."
+
+    return True, ""
+
+
 def get_quick_partial_hash(filepath: str, sample_size: int = 4096) -> Optional[str]:
     """Reads head and tail bytes to generate a fast intermediate verification signature."""
     try:
         size = os.path.getsize(filepath)
-        hasher = hashlib.blake2b(digest_size=16)
+        if size == 0:
+            return "empty_file"
+        hasher = hashlib.md5()
         with open(filepath, "rb") as f:
-            # Read first chunk
+            # Head bytes
             hasher.update(f.read(sample_size))
             if size > sample_size * 2:
-                # Seek and read last chunk
+                # Tail bytes
                 f.seek(size - sample_size)
                 hasher.update(f.read(sample_size))
         return hasher.hexdigest()
@@ -62,9 +162,9 @@ def get_quick_partial_hash(filepath: str, sample_size: int = 4096) -> Optional[s
 
 
 def get_full_hash(filepath: str, chunk_size: int = 65536) -> Optional[str]:
-    """Computes buffered full 128-bit BLAKE2b hash of the entire file."""
+    """Computes a cryptographically secure SHA-256 digest of the entire file."""
     try:
-        hasher = hashlib.blake2b(digest_size=20)
+        hasher = hashlib.sha256()
         with open(filepath, "rb") as f:
             while chunk := f.read(chunk_size):
                 hasher.update(chunk)
@@ -75,28 +175,28 @@ def get_full_hash(filepath: str, chunk_size: int = 65536) -> Optional[str]:
 
 def scan_duplicates(
     target_dirs: List[str],
-    min_size_bytes: int = 1024 * 1024,  # Default 1 MB threshold
+    min_size_mb: int = 1,
     file_types: Optional[Set[str]] = None,
-    max_depth: int = 7,
-    progress_callback: Optional[Callable[[str], None]] = None,
+    progress_callback: Optional[Callable[[str], None]] = None
 ) -> DuplicateScanResult:
     """
-    Ultra-fast 3-phase duplicate file scanner:
-    Phase 1: Direct O(1) file size clustering (eliminates ~95% of non-duplicates without reading file bodies).
-    Phase 2: Head/tail boundary hash check for size collisions.
-    Phase 3: Buffered cryptographic hash for exact byte parity.
+    Executes a high-efficiency multi-stage duplicate scan across the selected directories.
+    Stage 1: Size grouping
+    Stage 2: Fast partial boundary hash (Head & Tail)
+    Stage 3: Full SHA-256 cryptographic verification
+    Stage 4: Intelligent Original determination (curated library + clean filename priority)
     """
-    if progress_callback:
-        progress_callback("Auditing target directories...")
-
+    min_size_bytes = min_size_mb * 1024 * 1024
     size_map: Dict[int, List[str]] = {}
     total_scanned_files = 0
     total_scanned_bytes = 0
 
-    # 1. Phase 1: Directory Traversal & Size Indexing
-    def traverse_dir(folder: str, depth: int):
+    if progress_callback:
+        progress_callback("Enumerating files across target directories...")
+
+    def traverse_dir(folder: str, depth: int = 0):
         nonlocal total_scanned_files, total_scanned_bytes
-        if depth > max_depth or is_reparse_point(folder):
+        if depth > 15:
             return
 
         try:
@@ -178,18 +278,17 @@ def scan_duplicates(
         wasted_for_group = sz * (len(paths) - 1)
         total_wasted_bytes += wasted_for_group
 
-        # Sort files by creation/modification time so oldest is considered the "Original"
+        # Multi-factor Smart Original determination
         file_info_list = []
         for p in paths:
             try:
                 mtime = os.path.getmtime(p)
-                mtime_str = os.path.getmtime(p)
-                # Simple readable date format
-                import datetime
                 dt = datetime.datetime.fromtimestamp(mtime).strftime("%b %d, %Y %H:%M")
             except Exception:
                 mtime = 0
                 dt = "Unknown"
+
+            orig_score = score_originality(p, mtime)
 
             file_info_list.append({
                 "path": p,
@@ -197,10 +296,11 @@ def scan_duplicates(
                 "mtime": mtime,
                 "mtime_formatted": dt,
                 "ext": os.path.splitext(p)[1].lower(),
+                "orig_score": orig_score,
             })
 
-        # Oldest file first -> designated as Original
-        file_info_list.sort(key=lambda x: x["mtime"])
+        # Sort by originality score descending: highest score = True Original
+        file_info_list.sort(key=lambda x: x["orig_score"], reverse=True)
 
         dup_files: List[DuplicateFile] = []
         for idx, fi in enumerate(file_info_list):

@@ -536,12 +536,18 @@ class MainWindow(QMainWindow):
         self.status_dot.setStyleSheet("color: #10b981; font-size: 10px;")
         self.status_lbl.setText("Clean complete")
 
-        # Show celebration
-        cdlg = CelebrationDialog(format_bytes(total_reclaimed), self)
-        cdlg.exec()
+        deleted_set = set(deleted)
+        actual_reclaimed = sum(i.size_bytes for i in self.scanned_items if i.path in deleted_set)
 
-        if errors:
-            self._show_toast(f"Clean finished with {len(errors)} locked files skipped.", "info")
+        if deleted and actual_reclaimed > 0:
+            cdlg = CelebrationDialog(format_bytes(actual_reclaimed), self)
+            cdlg.exec()
+            if errors:
+                self._show_toast(f"Reclaimed {format_bytes(actual_reclaimed)}. {len(errors)} locked item(s) skipped.", "info")
+        elif errors:
+            self._show_toast(f"Clean failed: {errors[0]}", "error")
+        else:
+            self._show_toast("No items were removed.", "info")
 
         # Run fresh scan
         self.start_scan()

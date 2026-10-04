@@ -1088,12 +1088,42 @@ async function executeClean() {
   el.btnConfirmClean.textContent = 'Cleaning...';
 
   try {
-    await invoke('clean_selected_items', { paths });
+    const res = await invoke('clean_selected_items', { paths });
     closeCleanModal();
 
-    // Show celebration modal
-    el.celebrationReclaimedText.textContent = `+${formatBytes(totalReclaimed)}`;
-    el.successModal.classList.remove('hidden');
+    const deletedSet = new Set((res && res.deleted) || []);
+    const errorsList = (res && res.errors) || [];
+
+    // Calculate actual reclaimed bytes based strictly on verified deletions
+    let actualReclaimed = 0;
+    if (state.activeView === 'duplicates') {
+      state.duplicateSelectedIds.forEach((id) => {
+        const file = state.duplicateFilesMap.get(id);
+        if (file && deletedSet.has(file.path)) {
+          actualReclaimed += file.size_bytes;
+        }
+      });
+    } else {
+      state.items.forEach((item) => {
+        if (state.selectedIds.has(item.id) && deletedSet.has(item.path)) {
+          actualReclaimed += item.size_bytes;
+        }
+      });
+    }
+
+    if (deletedSet.size > 0) {
+      // Show celebration modal only for verified reclaimed space
+      el.celebrationReclaimedText.textContent = `+${formatBytes(actualReclaimed)}`;
+      el.successModal.classList.remove('hidden');
+
+      if (errorsList.length > 0) {
+        showToast(`Reclaimed ${formatBytes(actualReclaimed)}. ${errorsList.length} locked item(s) could not be removed.`, 'info');
+      }
+    } else if (errorsList.length > 0) {
+      showToast(`Clean failed: ${errorsList[0]}`, 'error');
+    } else {
+      showToast('No items were deleted.', 'info');
+    }
 
     // Trigger fresh scan
     await refreshDriveInfo();
