@@ -3,7 +3,7 @@ import sys
 import stat
 import ctypes
 from dataclasses import dataclass
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Tuple
 
 
 @dataclass
