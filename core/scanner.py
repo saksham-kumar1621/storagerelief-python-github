@@ -913,13 +913,20 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
         os.path.join(user_profile, "Downloads"),
         os.path.join(user_profile, "Desktop"),
         os.path.join(user_profile, "OneDrive", "Desktop"),
+        r"C:\Plugins Audio Editing",
+        r"C:\Hello PR",
     ]
 
+    seen_archive_paths = set(os.path.realpath(it.path).lower() for it in items)
     for d in scan_dirs:
         if not os.path.isdir(d):
             continue
         try:
             for entry in os.scandir(d):
+                real_p = os.path.realpath(entry.path).lower()
+                if real_p in seen_archive_paths:
+                    continue
+                seen_archive_paths.add(real_p)
                 try:
                     if entry.is_file():
                         sz = entry.stat().st_size
@@ -962,7 +969,60 @@ def scan_storage(drive_letter: str = "C:\\", progress_callback: Optional[Callabl
         except (PermissionError, OSError):
             continue
 
-    # 4. Developer Artifacts & Heavy Build Output
+    # =========================================================================
+    # 7. Screen Recordings, NVIDIA ShadowPlay & Heavy Video Captures (> 200 MB)
+    # =========================================================================
+    if progress_callback:
+        progress_callback("Auditing screen recordings, ShadowPlay & heavy media...")
+
+    video_exts = {".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm", ".ts"}
+    video_scan_dirs = [
+        os.path.join(user_profile, "Videos"),
+        os.path.join(user_profile, "OneDrive", "Videos"),
+        os.path.join(user_profile, "Videos", "Captures"),
+        os.path.join(user_profile, "Videos", "NVIDIA"),
+        os.path.join(user_profile, "OneDrive", "Videos", "NVIDIA"),
+        r"C:\live yt videos",
+        r"C:\Hello PR",
+    ]
+    seen_media_paths = set(it.path.lower() for it in items)
+    for v_dir in video_scan_dirs:
+        if not os.path.isdir(v_dir):
+            continue
+        try:
+            for root, dirs, files in os.walk(v_dir):
+                for f in files:
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in video_exts:
+                        p = os.path.join(root, f)
+                        norm_p = os.path.normpath(p).lower()
+                        if norm_p in seen_media_paths:
+                            continue
+                        seen_media_paths.add(norm_p)
+                        try:
+                            sz = os.path.getsize(p)
+                            if sz > 200 * 1024 * 1024:  # > 200 MB
+                                id_counter += 1
+                                items.append(StorageItem(
+                                    id=f"item_{id_counter}",
+                                    name=f,
+                                    path=p,
+                                    size_bytes=sz,
+                                    size_formatted=format_bytes(sz),
+                                    category="media_gaming",
+                                    category_label="Screen Recording / Heavy Media",
+                                    risk_level="review",
+                                    description="Large screen recording or video capture (> 200 MB). Review to keep or delete.",
+                                    selected=False,
+                                ))
+                        except (PermissionError, OSError):
+                            continue
+        except (PermissionError, OSError):
+            continue
+
+    # =========================================================================
+    # 8. Developer Artifacts & Heavy Build Output
+    # =========================================================================
     if progress_callback:
         progress_callback("Scanning developer project roots...")
 
