@@ -23,43 +23,84 @@ def _handle_remove_readonly(func, path, exc_info):
 # passwords, cookies, active sessions, tab states, and core operating
 # system roots are permanently blacklisted and protected from deletion.
 # =========================================================================
-FORBIDDEN_DELETION_PATTERNS = frozenset({
+# Exact file names (case-insensitive) that represent sensitive browser stores or system files
+FORBIDDEN_FILE_NAMES = frozenset({
     # Chromium / Edge / Brave / Opera sensitive profile stores
     "login data", "login data-journal", "login data.bak",
     "cookies", "cookies-journal",
     "web data", "web data-journal",
     "history", "history-journal",
-    "local state", "bookmarks", "preferences", "secure preferences",
-    # Active browser sessions, tab restore, and session storage
-    "session storage", "sessions", "current session", "current tabs",
-    "last session", "last tabs", "tab restore", "session restore",
-    # Firefox / Gecko credential & session stores
+    "local state", "bookmarks", "bookmarks.bak",
+    "preferences", "secure preferences",
+    # Active browser sessions & tab restore (files)
+    "current session", "current tabs",
+    "last session", "last tabs",
+    "tab restore", "session restore",
+    # Firefox / Gecko credential & session stores (files)
     "key4.db", "key3.db", "logins.json", "logins-backup.json",
     "places.sqlite", "places.sqlite-wal", "places.sqlite-shm",
     "formhistory.sqlite", "cert9.db", "cert8.db",
-    "sessionstore.jsonlz4", "sessionstore.js", "sessionstore-backups",
-    # Sensitive authentication and token stores
-    "token_service", "accounts", "sync data", "vault", "credentials",
-    # Critical Windows operating system roots and kernel files
-    "windows\\system32", "windows\\syswow64", "windows\\system",
+    "sessionstore.jsonlz4", "sessionstore.js",
+    # Sensitive authentication files & keys
+    "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+    # Critical Windows operating system root and kernel files
     "bootmgr", "ntldr", "pagefile.sys", "swapfile.sys", "hiberfil.sys"
 })
+
+# Exact directory component names that represent sensitive browser session / credential stores
+FORBIDDEN_DIR_NAMES = frozenset({
+    # Browser session and state directories
+    "sessions",
+    "session storage",
+    "sessionstore-backups",
+    "sync data",
+    "token_service",
+    # Sensitive host identity & credential folders
+    ".ssh",
+})
+
+# Backwards compatibility export combining file and dir patterns
+FORBIDDEN_DELETION_PATTERNS = frozenset(
+    FORBIDDEN_FILE_NAMES | FORBIDDEN_DIR_NAMES | {
+        "windows\\system32", "windows\\syswow64", "windows\\system",
+        "accounts", "vault", "credentials"
+    }
+)
 
 
 def is_path_protected_by_firewall(norm_path: str) -> Tuple[bool, str]:
     """
     Evaluates whether a target path violates security firewall assertions.
-    Protects both individual files and directory hierarchies.
+    Protects individual files and directory hierarchies without false positives
+    on legitimate developer build caches (e.g. Gradle executionHistory.lock, npm, pip).
     """
     norm_lower = os.path.normpath(norm_path).lower()
     base_name = os.path.basename(norm_lower)
 
-    # 1. Check exact filename or direct segment match
-    for forbidden in FORBIDDEN_DELETION_PATTERNS:
-        if forbidden == base_name or forbidden in norm_lower:
-            return True, f"Protected sensitive resource ({forbidden})"
+    # 1. Exact filename check (O(1) set lookup)
+    if base_name in FORBIDDEN_FILE_NAMES:
+        return True, f"Protected sensitive file ({base_name})"
 
-    # 2. Check for Drive Root or System Root
+    # 2. Path components / directory segment validation
+    # Splits path into exact path segments (e.g. ['c:', 'users', 'user', 'sessions', 'tabs'])
+    segments = [s for s in norm_lower.replace("/", "\\").split("\\") if s]
+    segment_set = set(segments)
+
+    # Check if target itself or any parent directory is a blacklisted sensitive store
+    for forbidden_dir in FORBIDDEN_DIR_NAMES:
+        if forbidden_dir in segment_set:
+            return True, f"Protected sensitive directory store ({forbidden_dir})"
+
+    # Specific credential store paths (AWS credentials, Windows Vault, Windows Credential Manager)
+    if norm_lower.endswith(r"\.aws\credentials") or norm_lower.endswith(r"\microsoft\credentials") or norm_lower.endswith(r"\microsoft\vault"):
+        return True, "Protected system or cloud credential store"
+
+    # 3. Windows System and Core Protected Directories (system32, syswow64, system)
+    for pattern in (r"\windows\system32", r"\windows\syswow64", r"\windows\system"):
+        if norm_lower.endswith(pattern) or (pattern + "\\") in norm_lower:
+            return True, f"Protected Windows system directory ({pattern})"
+
+    # 4. Check for Drive Root or System Root
     drive, rest = os.path.splitdrive(norm_lower)
     if rest.strip("\\/") == "":
         return True, f"Cannot delete drive root partition ({drive})"
@@ -150,6 +191,10 @@ def safe_delete_path(path: str) -> Tuple[bool, str]:
             # Pre-audit directory contents: ensure no subfolder or file violates firewall
             # (protects against targeting a browser profile root directly)
             for root, dirs, files in os.walk(abs_path, followlinks=False):
+                for d in dirs:
+                    d_blocked, _ = is_path_protected_by_firewall(os.path.join(root, d))
+                    if d_blocked:
+                        return False, f"Directory contains protected session or credential store ({d})"
                 for f in files:
                     f_blocked, _ = is_path_protected_by_firewall(os.path.join(root, f))
                     if f_blocked:

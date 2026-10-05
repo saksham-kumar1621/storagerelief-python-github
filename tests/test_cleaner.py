@@ -89,5 +89,64 @@ class TestCleanerFirewall(unittest.TestCase):
         self.assertIn(fake_path, errors[0])
 
 
+    def test_firewall_allows_legitimate_build_and_package_caches(self):
+        """Asserts that build caches (Gradle executionHistory.lock, npm, pip) are not blocked."""
+        test_allowed_paths = [
+            r"C:\Users\Default\.gradle\caches\8.2.1\executionHistory\executionHistory.lock",
+            r"C:\Users\Default\.gradle\caches\8.4\kotlin-dsl\executionHistory.bin",
+            r"C:\Users\Default\AppData\Local\npm-cache\corsredirectcontainscredentials.md",
+            r"C:\Users\Default\AppData\Local\npm-cache\emailverificationrequestaccountsemptylist.md",
+            r"C:\Users\Default\AppData\Local\Temp\history_report.txt",
+            r"C:\Users\Default\AppData\Local\Temp\user_preferences.ini",
+            r"C:\Users\Default\AppData\Local\pip\cache\wheels\test.whl",
+        ]
+        for p in test_allowed_paths:
+            blocked, reason = is_path_protected_by_firewall(p)
+            self.assertFalse(blocked, f"Path should NOT be blocked by firewall: {p} (reason: {reason})")
+
+    def test_safe_delete_directory_with_gradle_history_locks(self):
+        """Asserts that directories containing Gradle executionHistory.lock delete cleanly."""
+        temp_dir = tempfile.mkdtemp(prefix="sr_gradle_cache_test_")
+        try:
+            exec_history_dir = os.path.join(temp_dir, "8.2.1", "executionHistory")
+            os.makedirs(exec_history_dir, exist_ok=True)
+            lock_file = os.path.join(exec_history_dir, "executionHistory.lock")
+            with open(lock_file, "w") as f:
+                f.write("gradle lock data")
+
+            bin_dir = os.path.join(temp_dir, "8.4", "kotlin-dsl")
+            os.makedirs(bin_dir, exist_ok=True)
+            bin_file = os.path.join(bin_dir, "executionHistory.bin")
+            with open(bin_file, "w") as f:
+                f.write("gradle bin data")
+
+            self.assertTrue(os.path.exists(lock_file))
+            success, err_msg = safe_delete_path(temp_dir)
+            self.assertTrue(success, f"Deletion failed for gradle cache structure: {err_msg}")
+            self.assertFalse(os.path.exists(temp_dir))
+        finally:
+            if os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_safe_delete_aborts_on_directory_containing_sensitive_browser_credential(self):
+        """Asserts that safe_delete_path strictly refuses to delete directories containing browser credentials."""
+        temp_dir = tempfile.mkdtemp(prefix="sr_profile_test_")
+        try:
+            login_data = os.path.join(temp_dir, "Login Data")
+            with open(login_data, "w") as f:
+                f.write("sensitive password db")
+
+            success, err_msg = safe_delete_path(temp_dir)
+            self.assertFalse(success, "Directory containing Login Data must be blocked from deletion")
+            self.assertIn("protected session or credential store", err_msg.lower())
+            self.assertTrue(os.path.exists(temp_dir))
+        finally:
+            if os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
+
