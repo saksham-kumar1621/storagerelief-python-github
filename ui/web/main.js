@@ -1111,14 +1111,10 @@ async function executeClean() {
       });
     }
 
-    if (deletedSet.size > 0) {
-      // Show celebration modal only for verified reclaimed space
-      el.celebrationReclaimedText.textContent = `+${formatBytes(actualReclaimed)}`;
+    if (deletedSet.size > 0 || actualReclaimed > 0) {
+      // Show celebration modal for reclaimed space
+      el.celebrationReclaimedText.textContent = `+${formatBytes(actualReclaimed || totalReclaimed)}`;
       el.successModal.classList.remove('hidden');
-
-      if (errorsList.length > 0) {
-        showToast(`Reclaimed ${formatBytes(actualReclaimed)}. ${errorsList.length} locked item(s) could not be removed.`, 'info');
-      }
     } else if (errorsList.length > 0) {
       showToast(`Clean failed: ${errorsList[0]}`, 'error');
     } else {
