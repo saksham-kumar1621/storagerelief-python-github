@@ -82,5 +82,18 @@ class TestDuplicatesEngine(unittest.TestCase):
                     os.remove(p)
 
 
+    def test_scan_duplicates_argument_compatibility(self):
+        """Verifies scan_duplicates accepts both min_size_bytes and min_size_mb without raising TypeError."""
+        from core.duplicates import scan_duplicates
+        with tempfile.TemporaryDirectory() as td:
+            # Test with min_size_bytes keyword
+            res1 = scan_duplicates([td], min_size_bytes=1024)
+            self.assertEqual(res1.duplicate_groups_count, 0)
+
+            # Test with min_size_mb keyword
+            res2 = scan_duplicates([td], min_size_mb=2.0)
+            self.assertEqual(res2.duplicate_groups_count, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

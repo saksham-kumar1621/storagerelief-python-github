@@ -141,7 +141,7 @@ class StorageReliefAPI:
                 target_dirs = options
 
             min_bytes = int(min_size_mb * 1024 * 1024)
-            result = scan_duplicates(target_dirs, min_size_bytes=min_bytes)
+            result = scan_duplicates(target_dirs, min_size_mb=min_size_mb, min_size_bytes=min_bytes)
 
             groups_dict = []
             for g in result.groups:

@@ -175,7 +175,8 @@ def get_full_hash(filepath: str, chunk_size: int = 65536) -> Optional[str]:
 
 def scan_duplicates(
     target_dirs: List[str],
-    min_size_mb: int = 1,
+    min_size_mb: float = 1.0,
+    min_size_bytes: Optional[int] = None,
     file_types: Optional[Set[str]] = None,
     progress_callback: Optional[Callable[[str], None]] = None
 ) -> DuplicateScanResult:
@@ -186,7 +187,8 @@ def scan_duplicates(
     Stage 3: Full SHA-256 cryptographic verification
     Stage 4: Intelligent Original determination (curated library + clean filename priority)
     """
-    min_size_bytes = min_size_mb * 1024 * 1024
+    if min_size_bytes is None:
+        min_size_bytes = int(min_size_mb * 1024 * 1024)
     size_map: Dict[int, List[str]] = {}
     total_scanned_files = 0
     total_scanned_bytes = 0
