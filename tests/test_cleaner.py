@@ -147,6 +147,32 @@ class TestCleanerFirewall(unittest.TestCase):
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+    def test_firewall_blocks_real_browser_local_state_but_allows_temp_webview_local_state(self):
+        """Asserts that Local State in Chrome/Edge profile is blocked, but temp WebView2 Local State is allowed."""
+        chrome_local_state = r"C:\Users\Default\AppData\Local\Google\Chrome\User Data\Local State"
+        blocked, reason = is_path_protected_by_firewall(chrome_local_state)
+        self.assertTrue(blocked, "Chrome User Data Local State must be protected")
+        self.assertIn("local state", reason.lower())
+
+        edge_local_state = r"C:\Users\Default\AppData\Local\Microsoft\Edge\User Data\Local State"
+        blocked, reason = is_path_protected_by_firewall(edge_local_state)
+        self.assertTrue(blocked, "Edge User Data Local State must be protected")
+
+        temp_webview_local_state = r"C:\Users\Default\AppData\Local\Temp\tmp12345\EBWebView\Local State"
+        blocked, reason = is_path_protected_by_firewall(temp_webview_local_state)
+        self.assertFalse(blocked, f"Temp WebView Local State should NOT be blocked: {reason}")
+
+    def test_safe_delete_container_directory_temp(self):
+        """Asserts that calling safe_delete_path on %TEMP% purges inner contents and returns success."""
+        temp_dir = os.environ.get("TEMP")
+        if temp_dir and os.path.exists(temp_dir):
+            success, err_msg = safe_delete_path(temp_dir)
+            self.assertTrue(success, f"safe_delete_path on TEMP directory must succeed: {err_msg}")
+            # Ensure the TEMP directory itself was NOT deleted
+            self.assertTrue(os.path.exists(temp_dir), "TEMP directory container itself must remain intact")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

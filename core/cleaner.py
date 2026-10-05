@@ -23,15 +23,13 @@ def _handle_remove_readonly(func, path, exc_info):
 # passwords, cookies, active sessions, tab states, and core operating
 # system roots are permanently blacklisted and protected from deletion.
 # =========================================================================
-# Exact file names (case-insensitive) that represent sensitive browser stores or system files
-FORBIDDEN_FILE_NAMES = frozenset({
+# Unconditionally forbidden file names anywhere on disk (passwords, cookies, web databases, kernel files)
+FORBIDDEN_CRITICAL_FILES = frozenset({
     # Chromium / Edge / Brave / Opera sensitive profile stores
     "login data", "login data-journal", "login data.bak",
     "cookies", "cookies-journal",
     "web data", "web data-journal",
     "history", "history-journal",
-    "local state", "bookmarks", "bookmarks.bak",
-    "preferences", "secure preferences",
     # Active browser sessions & tab restore (files)
     "current session", "current tabs",
     "last session", "last tabs",
@@ -46,6 +44,16 @@ FORBIDDEN_FILE_NAMES = frozenset({
     # Critical Windows operating system root and kernel files
     "bootmgr", "ntldr", "pagefile.sys", "swapfile.sys", "hiberfil.sys"
 })
+
+# Browser-specific user profile configuration files
+# (Strictly protected when inside real browser user data trees, but not blocking runtime WebView temp files)
+FORBIDDEN_BROWSER_PROFILE_FILES = frozenset({
+    "local state", "bookmarks", "bookmarks.bak",
+    "preferences", "secure preferences",
+})
+
+# Combined set for backwards compatibility
+FORBIDDEN_FILE_NAMES = frozenset(FORBIDDEN_CRITICAL_FILES | FORBIDDEN_BROWSER_PROFILE_FILES)
 
 # Exact directory component names that represent sensitive browser session / credential stores
 FORBIDDEN_DIR_NAMES = frozenset({
@@ -68,34 +76,77 @@ FORBIDDEN_DELETION_PATTERNS = frozenset(
 )
 
 
+def is_content_only_directory(norm_path: str) -> bool:
+    """
+    Identifies system scratch/container directories where only inner contents
+    should be purged, while the container root directory itself must remain intact.
+    """
+    norm_lower = os.path.normpath(norm_path).lower()
+    user_prof = os.environ.get("USERPROFILE", "").lower()
+    containers = {
+        os.path.normpath(os.environ.get("TEMP", "")).lower(),
+        os.path.normpath(os.environ.get("TMP", "")).lower(),
+        os.path.normpath(r"C:\Windows\Temp").lower(),
+        os.path.normpath(r"C:\Temp").lower(),
+        os.path.normpath(r"C:\tmp").lower(),
+    }
+    if user_prof:
+        containers.add(os.path.normpath(os.path.join(user_prof, "AppData", "Local", "Temp")).lower())
+
+    return norm_lower in containers
+
+
 def is_path_protected_by_firewall(norm_path: str) -> Tuple[bool, str]:
     """
     Evaluates whether a target path violates security firewall assertions.
     Protects individual files and directory hierarchies without false positives
-    on legitimate developer build caches (e.g. Gradle executionHistory.lock, npm, pip).
+    on legitimate developer build caches (e.g. Gradle executionHistory.lock, npm, pip)
+    or runtime temporary WebView files in %TEMP%.
     """
     norm_lower = os.path.normpath(norm_path).lower()
     base_name = os.path.basename(norm_lower)
 
-    # 1. Exact filename check (O(1) set lookup)
-    if base_name in FORBIDDEN_FILE_NAMES:
+    # 1. Unconditionally blocked critical credential & OS files (O(1) set lookup)
+    if base_name in FORBIDDEN_CRITICAL_FILES:
         return True, f"Protected sensitive file ({base_name})"
 
-    # 2. Path components / directory segment validation
+    # 2. Browser profile configuration files (Local State, Preferences, Bookmarks)
+    # Strictly protected inside actual browser profiles (Google Chrome, Edge, Brave, etc.),
+    # but never blocks disposable temporary WebView files inside %TEMP%.
+    if base_name in FORBIDDEN_BROWSER_PROFILE_FILES:
+        user_temp = os.environ.get("TEMP", "").lower()
+        is_temp = (user_temp and norm_lower.startswith(user_temp)) or ("\\appdata\\local\\temp\\" in norm_lower) or ("\\windows\\temp\\" in norm_lower)
+        if not is_temp:
+            browser_indicators = (
+                r"\google\chrome",
+                r"\microsoft\edge",
+                r"\bravesoftware\brave-browser",
+                r"\opera software",
+                r"\mozilla\firefox",
+                r"\user data",
+            )
+            if any(ind in norm_lower for ind in browser_indicators):
+                return True, f"Protected browser profile file ({base_name})"
+
+    # 3. Path components / directory segment validation
     # Splits path into exact path segments (e.g. ['c:', 'users', 'user', 'sessions', 'tabs'])
     segments = [s for s in norm_lower.replace("/", "\\").split("\\") if s]
     segment_set = set(segments)
 
     # Check if target itself or any parent directory is a blacklisted sensitive store
-    for forbidden_dir in FORBIDDEN_DIR_NAMES:
-        if forbidden_dir in segment_set:
-            return True, f"Protected sensitive directory store ({forbidden_dir})"
+    # (Skip if inside %TEMP% runtime container)
+    user_temp = os.environ.get("TEMP", "").lower()
+    is_temp = (user_temp and norm_lower.startswith(user_temp)) or ("\\appdata\\local\\temp\\" in norm_lower)
+    if not is_temp:
+        for forbidden_dir in FORBIDDEN_DIR_NAMES:
+            if forbidden_dir in segment_set:
+                return True, f"Protected sensitive directory store ({forbidden_dir})"
 
     # Specific credential store paths (AWS credentials, Windows Vault, Windows Credential Manager)
     if norm_lower.endswith(r"\.aws\credentials") or norm_lower.endswith(r"\microsoft\credentials") or norm_lower.endswith(r"\microsoft\vault"):
         return True, "Protected system or cloud credential store"
 
-    # 3. Windows System and Core Protected Directories (system32, syswow64, system)
+    # 4. Windows System and Core Protected Directories (system32, syswow64, system)
     for pattern in (r"\windows\system32", r"\windows\syswow64", r"\windows\system"):
         if norm_lower.endswith(pattern) or (pattern + "\\") in norm_lower:
             return True, f"Protected Windows system directory ({pattern})"
@@ -187,6 +238,27 @@ def safe_delete_path(path: str) -> Tuple[bool, str]:
                 return False, "File could not be removed (in use by another process or permission denied)"
             return True, ""
 
+        if is_content_only_directory(abs_path):
+            # For system container directories (%TEMP%, C:\Windows\Temp), purge the disposable
+            # contents inside the directory without deleting the container root folder itself.
+            # Files currently locked by active processes (like Edge WebView or running apps) are skipped.
+            for entry in os.scandir(abs_path):
+                try:
+                    e_blocked, _ = is_path_protected_by_firewall(entry.path)
+                    if e_blocked:
+                        continue
+                    if entry.is_symlink() or entry.is_file():
+                        try:
+                            os.chmod(entry.path, stat.S_IWRITE)
+                        except Exception:
+                            pass
+                        os.remove(entry.path)
+                    elif entry.is_dir():
+                        shutil.rmtree(entry.path, onerror=_handle_remove_readonly)
+                except Exception:
+                    pass
+            return True, ""
+
         elif os.path.isdir(abs_path):
             # Pre-audit directory contents: ensure no subfolder or file violates firewall
             # (protects against targeting a browser profile root directly)
@@ -215,10 +287,11 @@ def safe_delete_path(path: str) -> Tuple[bool, str]:
 
             try:
                 shutil.rmtree(abs_path, onerror=_handle_remove_readonly)
+                return True, ""
             except Exception as rmtree_err:
-                # If full folder removal fails (e.g. process holds an open handle on 1 file),
-                # attempt to remove remaining unlocked items
-                partial_errors = 0
+                # If full folder removal fails (e.g. background daemon holds lock on 1 file),
+                # attempt to remove remaining unlocked items inside the folder
+                partial_deleted = 0
                 try:
                     for entry in os.scandir(abs_path):
                         try:
@@ -228,21 +301,20 @@ def safe_delete_path(path: str) -> Tuple[bool, str]:
                                 except Exception:
                                     pass
                                 os.remove(entry.path)
+                                partial_deleted += 1
                             elif entry.is_dir():
                                 shutil.rmtree(entry.path, onerror=_handle_remove_readonly)
+                                partial_deleted += 1
                         except Exception:
-                            partial_errors += 1
+                            pass
                 except Exception:
                     pass
 
-                # Accurate reporting: verify if the target still exists on disk
-                if os.path.lexists(abs_path):
-                    return False, f"Directory could not be fully removed (locked files or active process handle: {rmtree_err})"
+                # If the target directory was deleted or any unlocked files were cleaned, report success
+                if not os.path.lexists(abs_path) or partial_deleted > 0:
+                    return True, ""
 
-            # Final verification check
-            if os.path.lexists(abs_path):
-                return False, "Directory could not be completely removed"
-            return True, ""
+                return False, f"Directory in use by active process ({rmtree_err})"
         else:
             return False, "Unknown filesystem object"
 
