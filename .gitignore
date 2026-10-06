@@ -14,7 +14,6 @@ dist/
 build/
 *.egg-info/
 *.egg
-*.exe
 
 # IDE
 .vscode/
